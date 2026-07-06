@@ -1,0 +1,102 @@
+syntax = "proto3";
+
+package temporal.v1;
+
+option go_package = "github.com/api-time-machine/api_time_machine/api/gen/temporal/v1;temporalv1";
+
+import "google/protobuf/timestamp.proto";
+
+service TemporalService {
+  rpc GetUser(GetEntityRequest) returns (User);
+  rpc ReplayUser(ReplayRequest) returns (User);
+  rpc GetProduct(GetEntityRequest) returns (Product);
+  rpc ReplayProduct(ReplayRequest) returns (Product);
+  rpc GetOrder(GetEntityRequest) returns (Order);
+  rpc ReplayOrder(ReplayRequest) returns (Order);
+  rpc GetTimeline(TimelineRequest) returns (TimelineResponse);
+  rpc SearchEvents(SearchEventsRequest) returns (SearchEventsResponse);
+}
+
+message GetEntityRequest {
+  string id = 1;
+  google.protobuf.Timestamp at = 2;
+  int64 version = 3;
+}
+
+message ReplayRequest {
+  string id = 1;
+  google.protobuf.Timestamp at = 2;
+  int64 version = 3;
+}
+
+message User {
+  string id = 1;
+  string name = 2;
+  string email = 3;
+  int64 version = 4;
+  bool deleted = 5;
+}
+
+message Product {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  int64 price_cents = 4;
+  string currency = 5;
+  int64 version = 6;
+  bool deleted = 7;
+}
+
+message OrderItem {
+  string product_id = 1;
+  int32 quantity = 2;
+  int64 price_cents = 3;
+}
+
+message Order {
+  string id = 1;
+  string user_id = 2;
+  string status = 3;
+  int64 total_cents = 4;
+  string currency = 5;
+  repeated OrderItem items = 6;
+  int64 version = 7;
+  bool cancelled = 8;
+}
+
+message TimelineRequest {
+  string aggregate_type = 1;
+  string aggregate_id = 2;
+}
+
+message TimelineEntry {
+  int64 version = 1;
+  string event_type = 2;
+  int64 event_id = 3;
+  google.protobuf.Timestamp timestamp = 4;
+  string actor = 5;
+}
+
+message TimelineResponse {
+  repeated TimelineEntry entries = 1;
+}
+
+message SearchEventsRequest {
+  string aggregate_type = 1;
+  string aggregate_id = 2;
+  string event_type = 3;
+  string actor = 4;
+}
+
+message StoredEvent {
+  int64 id = 1;
+  string aggregate_type = 2;
+  string aggregate_id = 3;
+  string event_type = 4;
+  int64 version = 5;
+  bytes payload = 6;
+}
+
+message SearchEventsResponse {
+  repeated StoredEvent events = 1;
+}

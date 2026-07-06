@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>API Time Machine</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --accent-dim: #1f3a5f;
+      --green: #3fb950;
+      --red: #f85149;
+      --yellow: #d29922;
+      --purple: #bc8cff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+    }
+    header h1 { margin: 0; font-size: 18px; font-weight: 600; }
+    header span { color: var(--muted); font-size: 13px; }
+    main { display: grid; grid-template-columns: 300px 1fr 360px; gap: 16px; padding: 16px; }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    h2 { margin: 0 0 12px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+    label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+    input, select, button, textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 8px 10px;
+      margin-bottom: 10px;
+      font-size: 13px;
+    }
+    button {
+      background: #21262d;
+      cursor: pointer;
+      font-weight: 600;
+      transition: border-color .15s, color .15s, background .15s;
+    }
+    button:hover { border-color: var(--accent); color: var(--accent); }
+    button.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+    .btn-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .btn-row button { margin-bottom: 0; }
+    pre {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+      overflow: auto;
+      font-size: 12px;
+      line-height: 1.5;
+      max-height: 360px;
+      transition: opacity .2s ease;
+    }
+    pre.replaying { opacity: .55; }
+    pre.flash { animation: flash .4s ease; }
+    @keyframes flash {
+      0% { box-shadow: 0 0 0 0 rgba(88,166,255,.5); }
+      100% { box-shadow: 0 0 0 8px rgba(88,166,255,0); }
+    }
+    .replay-console {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+    .replay-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      font-size: 12px;
+    }
+    .replay-meta .version-badge {
+      background: var(--accent-dim);
+      color: var(--accent);
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-weight: 700;
+    }
+    .replay-meta .time-badge { color: var(--muted); }
+    .progress-track {
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--purple));
+      width: 0%;
+      transition: width .15s ease;
+    }
+    .slider-wrap { position: relative; margin-bottom: 8px; }
+    input[type=range] {
+      width: 100%;
+      padding: 0;
+      margin: 0;
+      accent-color: var(--accent);
+      background: transparent;
+    }
+    .slider-marks {
+      position: relative;
+      height: 16px;
+      margin-top: -6px;
+    }
+    .slider-mark {
+      position: absolute;
+      width: 6px; height: 6px;
+      background: var(--border);
+      border-radius: 50%;
+      top: 5px;
+      transform: translateX(-50%);
+      transition: background .15s, transform .15s;
+      cursor: pointer;
+    }
+    .slider-mark.passed { background: var(--accent); }
+    .slider-mark.active { background: var(--purple); transform: translateX(-50%) scale(1.4); }
+    .timeline { list-style: none; padding: 0; margin: 0; max-height: 280px; overflow-y: auto; }
+    .timeline li {
+      border-left: 2px solid var(--border);
+      padding: 8px 0 8px 14px;
+      margin-left: 6px;
+      position: relative;
+      transition: background .2s, border-color .2s;
+      border-radius: 0 6px 6px 0;
+      cursor: pointer;
+    }
+    .timeline li:hover { background: rgba(88,166,255,.06); }
+    .timeline li.active {
+      border-left-color: var(--purple);
+      background: rgba(188,140,255,.1);
+    }
+    .timeline li.passed { border-left-color: var(--accent); }
+    .timeline li::before {
+      content: "";
+      width: 8px; height: 8px;
+      background: var(--border);
+      border-radius: 50%;
+      position: absolute;
+      left: -5px; top: 14px;
+      transition: background .2s, box-shadow .2s;
+    }
+    .timeline li.passed::before { background: var(--accent); }
+    .timeline li.active::before {
+      background: var(--purple);
+      box-shadow: 0 0 8px var(--purple);
+    }
+    .timeline .etype { color: var(--accent); font-weight: 600; font-size: 13px; }
+    .timeline li.active .etype { color: var(--purple); }
+    .timeline .meta { color: var(--muted); font-size: 11px; margin-top: 2px; }
+    .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .metric {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px;
+    }
+    .metric strong { display: block; font-size: 20px; }
+    .metric span { color: var(--muted); font-size: 11px; }
+    .diff-line { font-family: ui-monospace, monospace; font-size: 12px; line-height: 1.6; }
+    .diff-add { color: var(--green); }
+    .diff-del { color: var(--red); }
+    .diff-chg { color: var(--yellow); }
+    .speed-select { margin-bottom: 0; }
+    kbd {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 11px;
+    }
+    .hint { font-size: 11px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>API Time Machine</h1>
+    <span>Temporal Entity Inspector</span>
+  </header>
+  <main>
+    <section class="panel">
+      <h2>Controls</h2>
+      <label>Entity Type</label>
+      <select id="entityType">
+        <option value="users">users</option>
+        <option value="products">products</option>
+        <option value="orders">orders</option>
+      </select>
+      <label>Entity ID</label>
+      <input id="entityId" value="42" />
+
+      <h2 style="margin-top:16px">Replay Animation</h2>
+      <div class="replay-console">
+        <div class="replay-meta">
+          <span class="version-badge">v<span id="versionLabel">0</span> / <span id="versionMax">0</span></span>
+          <span class="time-badge" id="timeLabel">—</span>
+        </div>
+        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="slider-wrap">
+          <input id="versionSlider" type="range" min="0" max="0" value="0" />
+          <div class="slider-marks" id="sliderMarks"></div>
+        </div>
+        <div class="btn-row">
+          <button id="stepBackBtn" title="Previous version">◀</button>
+          <button id="playBtn" title="Play / Pause (Space)">▶</button>
+          <button id="stepFwdBtn" title="Next version">▶▶</button>
+        </div>
+      </div>
+
+      <label>Playback speed</label>
+      <select id="speedSelect" class="speed-select">
+        <option value="1200">0.5×</option>
+        <option value="600" selected>1×</option>
+        <option value="300">2×</option>
+        <option value="150">4×</option>
+      </select>
+
+      <button id="loadBtn">Load Current</button>
+      <button id="timelineBtn">Load Timeline</button>
+      <button id="historyBtn">Load History</button>
+      <button id="diffBtn">Diff v1 → current</button>
+      <p class="hint"><kbd>Space</kbd> play · <kbd>←</kbd><kbd>→</kbd> step · click timeline to jump</p>
+    </section>
+
+    <section class="panel">
+      <h2>Entity State</h2>
+      <pre id="stateOut">{}</pre>
+      <h2>Timeline</h2>
+      <ul class="timeline" id="timelineOut"></ul>
+    </section>
+
+    <section class="panel">
+      <h2>Diff Viewer</h2>
+      <pre id="diffOut" class="diff-line">Scrub the slider to see field changes.</pre>
+      <h2>Live Metrics</h2>
+      <div class="metrics" id="metricsOut"></div>
+      <h2>Event Browser</h2>
+      <pre id="eventsOut">[]</pre>
+    </section>
+  </main>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const state = {
+      timeline: [],
+      maxVersion: 0,
+      currentVersion: 0,
+      prevState: null,
+      lastFetchedVersion: null,
+      playing: false,
+      playTimer: null,
+    };
+
+    async function api(path) {
+      const r = await fetch(path);
+      if (!r.ok) throw new Error(await r.text());
+      return r.json();
+    }
+
+    function entityPath() {
+      return `/${$("entityType").value}/${$("entityId").value}`;
+    }
+
+    function setProgress(version) {
+      const max = state.maxVersion || 1;
+      $("progressFill").style.width = `${(version / max) * 100}%`;
+      $("versionLabel").textContent = version;
+      $("versionSlider").value = version;
+      updateTimelineHighlight(version);
+      updateSliderMarks(version);
+    }
+
+    function updateTimelineHighlight(version) {
+      document.querySelectorAll("#timelineOut li").forEach((li) => {
+        const v = Number(li.dataset.version);
+        li.classList.toggle("active", v === version);
+        li.classList.toggle("passed", v < version);
+      });
+    }
+
+    function updateSliderMarks(version) {
+      document.querySelectorAll(".slider-mark").forEach((m) => {
+        const v = Number(m.dataset.version);
+        m.classList.toggle("active", v === version);
+        m.classList.toggle("passed", v <= version);
+      });
+    }
+
+    function renderSliderMarks() {
+      const wrap = $("sliderMarks");
+      wrap.innerHTML = "";
+      const max = state.maxVersion;
+      if (!max) return;
+      state.timeline.forEach((row) => {
+        const mark = document.createElement("div");
+        mark.className = "slider-mark";
+        mark.dataset.version = row.version;
+        mark.style.left = `${(row.version / max) * 100}%`;
+        mark.title = `v${row.version} ${row.event_type}`;
+        mark.onclick = () => jumpToVersion(row.version);
+        wrap.appendChild(mark);
+      });
+    }
+
+    function renderTimeline(rows) {
+      state.timeline = rows;
+      $("timelineOut").innerHTML = rows.map((r) =>
+        `<li data-version="${r.version}" title="Jump to v${r.version}">
+          <div class="etype">v${r.version} ${r.event_type}</div>
+          <div class="meta">${formatTime(r.timestamp)} · ${r.actor || "system"}</div>
+        </li>`
+      ).join("");
+      document.querySelectorAll("#timelineOut li").forEach((li) => {
+        li.onclick = () => jumpToVersion(Number(li.dataset.version));
+      });
+      renderSliderMarks();
+    }
+
+    function formatTime(ts) {
+      if (!ts) return "—";
+      const d = new Date(ts);
+      return d.toLocaleString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit", month: "short", day: "numeric" });
+    }
+
+    function highlightDiff(prev, next) {
+      if (!prev || !next) {
+        $("diffOut").textContent = "No prior state to compare.";
+        return;
+      }
+      const lines = [];
+      const keys = new Set([...Object.keys(prev), ...Object.keys(next)]);
+      keys.forEach((k) => {
+        if (["version", "updated_at", "created_at"].includes(k)) return;
+        const a = JSON.stringify(prev[k]);
+        const b = JSON.stringify(next[k]);
+        if (a === b) {
+          lines.push(`  ${k}: ${b}`);
+        } else if (prev[k] === undefined) {
+          lines.push(`<span class="diff-add">+ ${k}: ${b}</span>`);
+        } else if (next[k] === undefined) {
+          lines.push(`<span class="diff-del">- ${k}: ${a}</span>`);
+        } else {
+          lines.push(`<span class="diff-chg">~ ${k}: ${a} → ${b}</span>`);
+        }
+      });
+      $("diffOut").innerHTML = lines.join("\n") || "No field changes at this version.";
+    }
+
+    async function fetchVersion(version) {
+      const out = $("stateOut");
+      out.classList.add("replaying");
+      const data = version === 0
+        ? {}
+        : await api(`${entityPath()}?version=${version}`);
+      out.classList.remove("replaying");
+      out.classList.remove("flash");
+      void out.offsetWidth;
+      out.classList.add("flash");
+      out.textContent = JSON.stringify(data, null, 2);
+
+      const row = state.timeline.find((r) => r.version === version);
+      $("timeLabel").textContent = row ? formatTime(row.timestamp) : (version === 0 ? "before creation" : "—");
+
+      let prev = state.lastFetchedVersion === version - 1 ? state.prevState : null;
+      if (version > 0 && prev === null) {
+        try {
+          prev = version > 1 ? await api(`${entityPath()}?version=${version - 1}`) : null;
+        } catch { prev = null; }
+      }
+      highlightDiff(prev, version === 0 ? null : data);
+      state.prevState = version === 0 ? null : JSON.parse(JSON.stringify(data));
+      state.lastFetchedVersion = version;
+      state.currentVersion = version;
+      setProgress(version);
+    }
+
+    async function jumpToVersion(version) {
+      stopPlay();
+      await fetchVersion(version);
+    }
+
+    async function loadCurrent() {
+      stopPlay();
+      const data = await api(entityPath());
+      state.maxVersion = data.version || 0;
+      state.currentVersion = state.maxVersion;
+      state.prevState = null;
+      $("versionMax").textContent = state.maxVersion;
+      $("versionSlider").max = state.maxVersion;
+      $("versionSlider").min = 0;
+      await fetchVersion(state.maxVersion);
+      await loadTimeline();
+      await loadHistory();
+    }
+
+    async function loadTimeline() {
+      const rows = await api(`${entityPath()}/timeline`);
+      if (rows.length) {
+        state.maxVersion = Math.max(state.maxVersion, rows[rows.length - 1].version);
+        $("versionMax").textContent = state.maxVersion;
+        $("versionSlider").max = state.maxVersion;
+      }
+      renderTimeline(rows);
+      setProgress(state.currentVersion);
+    }
+
+    async function loadHistory() {
+      const rows = await api(`${entityPath()}/history`);
+      $("eventsOut").textContent = JSON.stringify(rows, null, 2);
+    }
+
+    async function loadDiff() {
+      const data = await api(`${entityPath()}/diff?from=1&to=`);
+      $("diffOut").textContent = JSON.stringify(data, null, 2);
+    }
+
+    async function loadMetrics() {
+      const text = await fetch("/metrics").then((r) => r.text());
+      const lines = text.split("\n").filter((l) => l.startsWith("atm_") && !l.startsWith("#"));
+      $("metricsOut").innerHTML = lines.slice(0, 6).map((l) => {
+        const [k, v] = l.split(" ");
+        return `<div class="metric"><strong>${v || "-"}</strong><span>${k}</span></div>`;
+      }).join("");
+    }
+
+    function stopPlay() {
+      state.playing = false;
+      $("playBtn").textContent = "▶";
+      $("playBtn").classList.remove("active");
+      if (state.playTimer) {
+        clearTimeout(state.playTimer);
+        state.playTimer = null;
+      }
+    }
+
+    async function playLoop() {
+      if (!state.playing) return;
+      if (state.currentVersion >= state.maxVersion) {
+        stopPlay();
+        return;
+      }
+      await fetchVersion(state.currentVersion + 1);
+      const delay = Number($("speedSelect").value);
+      state.playTimer = setTimeout(playLoop, delay);
+    }
+
+    function togglePlay() {
+      if (state.playing) {
+        stopPlay();
+        return;
+      }
+      if (state.currentVersion >= state.maxVersion) {
+        state.currentVersion = 0;
+        state.prevState = null;
+      }
+      state.playing = true;
+      $("playBtn").textContent = "⏸";
+      $("playBtn").classList.add("active");
+      playLoop();
+    }
+
+    $("versionSlider").addEventListener("input", async (e) => {
+      if (state.playing) stopPlay();
+      const v = Number(e.target.value);
+      if (v !== state.currentVersion) await fetchVersion(v);
+    });
+
+    $("stepBackBtn").onclick = () => jumpToVersion(Math.max(0, state.currentVersion - 1));
+    $("stepFwdBtn").onclick = () => jumpToVersion(Math.min(state.maxVersion, state.currentVersion + 1));
+    $("playBtn").onclick = togglePlay;
+    $("loadBtn").onclick = loadCurrent;
+    $("timelineBtn").onclick = loadTimeline;
+    $("historyBtn").onclick = loadHistory;
+    $("diffBtn").onclick = loadDiff;
+    $("entityType").onchange = loadCurrent;
+    $("entityId").onchange = loadCurrent;
+
+    document.addEventListener("keydown", (e) => {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+      if (e.code === "Space") { e.preventDefault(); togglePlay(); }
+      if (e.code === "ArrowLeft") { e.preventDefault(); jumpToVersion(Math.max(0, state.currentVersion - 1)); }
+      if (e.code === "ArrowRight") { e.preventDefault(); jumpToVersion(Math.min(state.maxVersion, state.currentVersion + 1)); }
+    });
+
+    loadCurrent().catch(() => {
+      $("stateOut").textContent = "Entity not found. Create one via the API first.";
+    });
+    loadMetrics();
+    setInterval(loadMetrics, 5000);
+  </script>
+</body>
+</html>
