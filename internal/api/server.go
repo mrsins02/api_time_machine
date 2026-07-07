@@ -64,20 +64,11 @@ func (s *Server) Router() http.Handler {
 		r.Post("/token", s.issueToken)
 	})
 
-	r.Group(func(r chi.Router) {
-		r.Use(auth.RequireWrite)
-		s.mountUserCommands(r)
-		s.mountProductCommands(r)
-		s.mountOrderCommands(r)
-	})
+	s.mountUsers(r)
+	s.mountProducts(r)
+	s.mountOrders(r)
 
-	r.Group(func(r chi.Router) {
-		r.Use(auth.RequireReplay)
-		s.mountUserQueries(r)
-		s.mountProductQueries(r)
-		s.mountOrderQueries(r)
-		r.Get("/events", s.searchEvents)
-	})
+	r.With(auth.RequireReplay).Get("/events", s.searchEvents)
 
 	return r
 }
@@ -111,58 +102,61 @@ func (s *Server) issueToken(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"token": token})
 }
 
-func (s *Server) mountUserCommands(r chi.Router) {
+func (s *Server) mountUsers(r chi.Router) {
 	r.Route("/users", func(r chi.Router) {
-		r.Post("/", s.createUser)
-		r.Put("/{id}", s.updateUser)
-		r.Delete("/{id}", s.deleteUser)
+		r.Group(func(r chi.Router) {
+			r.Use(auth.RequireWrite)
+			r.Post("/", s.createUser)
+			r.Put("/{id}", s.updateUser)
+			r.Delete("/{id}", s.deleteUser)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(auth.RequireReplay)
+			r.Get("/{id}", s.getUser)
+			r.Get("/{id}/history", s.userHistory)
+			r.Get("/{id}/timeline", s.userTimeline)
+			r.Get("/{id}/diff", s.userDiff)
+			r.Post("/{id}/replay", s.userReplay)
+			r.Post("/{id}/preview", s.userPreview)
+		})
 	})
 }
 
-func (s *Server) mountUserQueries(r chi.Router) {
-	r.Route("/users", func(r chi.Router) {
-		r.Get("/{id}", s.getUser)
-		r.Get("/{id}/history", s.userHistory)
-		r.Get("/{id}/timeline", s.userTimeline)
-		r.Get("/{id}/diff", s.userDiff)
-		r.Post("/{id}/replay", s.userReplay)
-		r.Post("/{id}/preview", s.userPreview)
-	})
-}
-
-func (s *Server) mountProductCommands(r chi.Router) {
+func (s *Server) mountProducts(r chi.Router) {
 	r.Route("/products", func(r chi.Router) {
-		r.Post("/", s.createProduct)
-		r.Put("/{id}", s.updateProduct)
-		r.Delete("/{id}", s.deleteProduct)
+		r.Group(func(r chi.Router) {
+			r.Use(auth.RequireWrite)
+			r.Post("/", s.createProduct)
+			r.Put("/{id}", s.updateProduct)
+			r.Delete("/{id}", s.deleteProduct)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(auth.RequireReplay)
+			r.Get("/{id}", s.getProduct)
+			r.Get("/{id}/history", s.productHistory)
+			r.Get("/{id}/timeline", s.productTimeline)
+			r.Get("/{id}/diff", s.productDiff)
+			r.Post("/{id}/replay", s.productReplay)
+		})
 	})
 }
 
-func (s *Server) mountProductQueries(r chi.Router) {
-	r.Route("/products", func(r chi.Router) {
-		r.Get("/{id}", s.getProduct)
-		r.Get("/{id}/history", s.productHistory)
-		r.Get("/{id}/timeline", s.productTimeline)
-		r.Get("/{id}/diff", s.productDiff)
-		r.Post("/{id}/replay", s.productReplay)
-	})
-}
-
-func (s *Server) mountOrderCommands(r chi.Router) {
+func (s *Server) mountOrders(r chi.Router) {
 	r.Route("/orders", func(r chi.Router) {
-		r.Post("/", s.createOrder)
-		r.Put("/{id}", s.updateOrder)
-		r.Post("/{id}/cancel", s.cancelOrder)
-		r.Post("/{id}/items", s.addOrderItem)
-	})
-}
-
-func (s *Server) mountOrderQueries(r chi.Router) {
-	r.Route("/orders", func(r chi.Router) {
-		r.Get("/{id}", s.getOrder)
-		r.Get("/{id}/history", s.orderHistory)
-		r.Get("/{id}/timeline", s.orderTimeline)
-		r.Get("/{id}/diff", s.orderDiff)
-		r.Post("/{id}/replay", s.orderReplay)
+		r.Group(func(r chi.Router) {
+			r.Use(auth.RequireWrite)
+			r.Post("/", s.createOrder)
+			r.Put("/{id}", s.updateOrder)
+			r.Post("/{id}/cancel", s.cancelOrder)
+			r.Post("/{id}/items", s.addOrderItem)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(auth.RequireReplay)
+			r.Get("/{id}", s.getOrder)
+			r.Get("/{id}/history", s.orderHistory)
+			r.Get("/{id}/timeline", s.orderTimeline)
+			r.Get("/{id}/diff", s.orderDiff)
+			r.Post("/{id}/replay", s.orderReplay)
+		})
 	})
 }
